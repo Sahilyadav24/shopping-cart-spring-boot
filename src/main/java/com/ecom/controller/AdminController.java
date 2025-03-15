@@ -9,7 +9,10 @@ import java.nio.file.StandardCopyOption;
 import java.security.Principal;
 import java.util.List;
 
+import com.ecom.service.*;
+import com.ecom.util.BucketType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Page;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,11 +31,6 @@ import com.ecom.model.Category;
 import com.ecom.model.Product;
 import com.ecom.model.ProductOrder;
 import com.ecom.model.UserDtls;
-import com.ecom.service.CartService;
-import com.ecom.service.CategoryService;
-import com.ecom.service.OrderService;
-import com.ecom.service.ProductService;
-import com.ecom.service.UserService;
 import com.ecom.util.CommonUtil;
 import com.ecom.util.OrderStatus;
 
@@ -59,6 +57,9 @@ public class AdminController {
 
 	@Autowired
 	private CommonUtil commonUtil;
+
+	@Autowired
+	private FileService fileService;
 
 	@Autowired
 	private PasswordEncoder passwordEncoder;
@@ -91,7 +92,7 @@ public class AdminController {
 
 	@GetMapping("/category")
 	public String category(Model m, @RequestParam(name = "pageNo", defaultValue = "0") Integer pageNo,
-			@RequestParam(name = "pageSize", defaultValue = "10") Integer pageSize) {
+						   @RequestParam(name = "pageSize", defaultValue = "10") Integer pageSize) {
 		// m.addAttribute("categorys", categoryService.getAllCategory());
 		Page<Category> page = categoryService.getAllCategorPagination(pageNo, pageSize);
 		List<Category> categorys = page.getContent();
@@ -109,10 +110,12 @@ public class AdminController {
 
 	@PostMapping("/saveCategory")
 	public String saveCategory(@ModelAttribute Category category, @RequestParam("file") MultipartFile file,
-			HttpSession session) throws IOException {
+							   HttpSession session) throws IOException {
 
-		String imageName = file != null ? file.getOriginalFilename() : "default.jpg";
-		category.setImageName(imageName);
+		//String imageName = file != null ? file.getOriginalFilename() : "default.jpg";
+		String imageUrl = commonUtil.getImageUrl(file, BucketType.CATEGORY.getId());
+
+		category.setImageName(imageUrl);
 
 		Boolean existCategory = categoryService.existCategory(category.getName());
 
@@ -133,6 +136,8 @@ public class AdminController {
 
 				// System.out.println(path);
 				Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+
+				fileService.uploadFileS3(file,1);
 
 				session.setAttribute("succMsg", "Saved successfully");
 			}
@@ -162,16 +167,17 @@ public class AdminController {
 
 	@PostMapping("/updateCategory")
 	public String updateCategory(@ModelAttribute Category category, @RequestParam("file") MultipartFile file,
-			HttpSession session) throws IOException {
+								 HttpSession session) throws IOException {
 
 		Category oldCategory = categoryService.getCategoryById(category.getId());
-		String imageName = file.isEmpty() ? oldCategory.getImageName() : file.getOriginalFilename();
+//		String imageName = file.isEmpty() ? oldCategory.getImageName() : file.getOriginalFilename();
+		String imageUrl = commonUtil.getImageUrl(file, BucketType.CATEGORY.getId());
 
 		if (!ObjectUtils.isEmpty(category)) {
 
 			oldCategory.setName(category.getName());
 			oldCategory.setIsActive(category.getIsActive());
-			oldCategory.setImageName(imageName);
+			oldCategory.setImageName(imageUrl);
 		}
 
 		Category updateCategory = categoryService.saveCategory(oldCategory);
@@ -179,13 +185,14 @@ public class AdminController {
 		if (!ObjectUtils.isEmpty(updateCategory)) {
 
 			if (!file.isEmpty()) {
-				File saveFile = new ClassPathResource("static/img").getFile();
-
-				Path path = Paths.get(saveFile.getAbsolutePath() + File.separator + "category_img" + File.separator
-						+ file.getOriginalFilename());
-
-				// System.out.println(path);
-				Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+//				File saveFile = new ClassPathResource("static/img").getFile();
+//
+//				Path path = Paths.get(saveFile.getAbsolutePath() + File.separator + "category_img" + File.separator
+//						+ file.getOriginalFilename());
+//
+//				// System.out.println(path);
+//				Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+				fileService.uploadFileS3(file,1);
 			}
 
 			session.setAttribute("succMsg", "Category update success");
@@ -198,25 +205,26 @@ public class AdminController {
 
 	@PostMapping("/saveProduct")
 	public String saveProduct(@ModelAttribute Product product, @RequestParam("file") MultipartFile image,
-			HttpSession session) throws IOException {
+							  HttpSession session) throws IOException {
 
-		String imageName = image.isEmpty() ? "default.jpg" : image.getOriginalFilename();
+//		String imageName = image.isEmpty() ? "default.jpg" : image.getOriginalFilename();
+		String imageUrl = commonUtil.getImageUrl(image, BucketType.PRODUCT.getId());
 
-		product.setImage(imageName);
+		product.setImage(imageUrl);
 		product.setDiscount(0);
 		product.setDiscountPrice(product.getPrice());
 		Product saveProduct = productService.saveProduct(product);
 
 		if (!ObjectUtils.isEmpty(saveProduct)) {
 
-			File saveFile = new ClassPathResource("static/img").getFile();
-
-			Path path = Paths.get(saveFile.getAbsolutePath() + File.separator + "product_img" + File.separator
-					+ image.getOriginalFilename());
-
-			// System.out.println(path);
-			Files.copy(image.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
-
+//			File saveFile = new ClassPathResource("static/img").getFile();
+//
+//			Path path = Paths.get(saveFile.getAbsolutePath() + File.separator + "product_img" + File.separator
+//					+ image.getOriginalFilename());
+//
+//			// System.out.println(path);
+//			Files.copy(image.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+			fileService.uploadFileS3(image,BucketType.PRODUCT.getId());
 			session.setAttribute("succMsg", "Product Saved Success");
 		} else {
 			session.setAttribute("errorMsg", "something wrong on server");
@@ -227,8 +235,8 @@ public class AdminController {
 
 	@GetMapping("/products")
 	public String loadViewProduct(Model m, @RequestParam(defaultValue = "") String ch,
-			@RequestParam(name = "pageNo", defaultValue = "0") Integer pageNo,
-			@RequestParam(name = "pageSize", defaultValue = "10") Integer pageSize) {
+								  @RequestParam(name = "pageNo", defaultValue = "0") Integer pageNo,
+								  @RequestParam(name = "pageSize", defaultValue = "10") Integer pageSize) {
 
 //		List<Product> products = null;
 //		if (ch != null && ch.length() > 0) {
@@ -276,7 +284,7 @@ public class AdminController {
 
 	@PostMapping("/updateProduct")
 	public String updateProduct(@ModelAttribute Product product, @RequestParam("file") MultipartFile image,
-			HttpSession session, Model m) {
+								HttpSession session, Model m) {
 
 		if (product.getDiscount() < 0 || product.getDiscount() > 100) {
 			session.setAttribute("errorMsg", "invalid Discount");
@@ -317,7 +325,7 @@ public class AdminController {
 
 	@GetMapping("/orders")
 	public String getAllOrders(Model m, @RequestParam(name = "pageNo", defaultValue = "0") Integer pageNo,
-			@RequestParam(name = "pageSize", defaultValue = "10") Integer pageSize) {
+							   @RequestParam(name = "pageSize", defaultValue = "10") Integer pageSize) {
 //		List<ProductOrder> allOrders = orderService.getAllOrders();
 //		m.addAttribute("orders", allOrders);
 //		m.addAttribute("srch", false);
@@ -366,8 +374,8 @@ public class AdminController {
 
 	@GetMapping("/search-order")
 	public String searchProduct(@RequestParam String orderId, Model m, HttpSession session,
-			@RequestParam(name = "pageNo", defaultValue = "0") Integer pageNo,
-			@RequestParam(name = "pageSize", defaultValue = "10") Integer pageSize) {
+								@RequestParam(name = "pageNo", defaultValue = "0") Integer pageNo,
+								@RequestParam(name = "pageSize", defaultValue = "10") Integer pageSize) {
 
 		if (orderId != null && orderId.length() > 0) {
 
@@ -399,7 +407,6 @@ public class AdminController {
 
 		}
 		return "/admin/orders";
-
 	}
 
 	@GetMapping("/add-admin")
@@ -411,19 +418,22 @@ public class AdminController {
 	public String saveAdmin(@ModelAttribute UserDtls user, @RequestParam("img") MultipartFile file, HttpSession session)
 			throws IOException {
 
-		String imageName = file.isEmpty() ? "default.jpg" : file.getOriginalFilename();
-		user.setProfileImage(imageName);
+//		String imageName = file.isEmpty() ? "default.jpg" : file.getOriginalFilename();
+		String imageUrl = commonUtil.getImageUrl(file, BucketType.CATEGORY.getId());
+		user.setProfileImage(imageUrl);
 		UserDtls saveUser = userService.saveAdmin(user);
 
 		if (!ObjectUtils.isEmpty(saveUser)) {
 			if (!file.isEmpty()) {
-				File saveFile = new ClassPathResource("static/img").getFile();
+//				File saveFile = new ClassPathResource("static/img").getFile();
+//
+//				Path path = Paths.get(saveFile.getAbsolutePath() + File.separator + "profile_img" + File.separator
+//						+ file.getOriginalFilename());
+//
+////				System.out.println(path);
+//				Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+				fileService.uploadFileS3(file,BucketType.PROFILE.getId());
 
-				Path path = Paths.get(saveFile.getAbsolutePath() + File.separator + "profile_img" + File.separator
-						+ file.getOriginalFilename());
-
-//				System.out.println(path);
-				Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
 			}
 			session.setAttribute("succMsg", "Register successfully");
 		} else {
@@ -451,7 +461,7 @@ public class AdminController {
 
 	@PostMapping("/change-password")
 	public String changePassword(@RequestParam String newPassword, @RequestParam String currentPassword, Principal p,
-			HttpSession session) {
+								 HttpSession session) {
 		UserDtls loggedInUserDetails = commonUtil.getLoggedInUserDetails(p);
 
 		boolean matches = passwordEncoder.matches(currentPassword, loggedInUserDetails.getPassword());

@@ -23,7 +23,7 @@ public class CommonUtil {
 
 	@Autowired
 	private JavaMailSender mailSender;
-	
+
 	@Autowired
 	private UserService userService;
 
@@ -61,12 +61,12 @@ public class CommonUtil {
 
 		return siteUrl.replace(request.getServletPath(), "");
 	}
-	
+
 	String msg=null;;
-	
+
 	public Boolean sendMailForProductOrder(ProductOrder order,String status) throws Exception
 	{
-		
+
 		msg="<p>Hello [[name]],</p>"
 				+ "<p>Thank you order <b>[[orderStatus]]</b>.</p>"
 				+ "<p><b>Product Details:</b></p>"
@@ -75,7 +75,7 @@ public class CommonUtil {
 				+ "<p>Quantity : [[quantity]]</p>"
 				+ "<p>Price : [[price]]</p>"
 				+ "<p>Payment Type : [[paymentType]]</p>";
-		
+
 		MimeMessage message = mailSender.createMimeMessage();
 		MimeMessageHelper helper = new MimeMessageHelper(message);
 
@@ -89,13 +89,13 @@ public class CommonUtil {
 		msg=msg.replace("[[quantity]]", order.getQuantity().toString());
 		msg=msg.replace("[[price]]", order.getPrice().toString());
 		msg=msg.replace("[[paymentType]]", order.getPaymentType());
-		
+
 		helper.setSubject("Product Order Status");
 		helper.setText(msg, true);
 		mailSender.send(message);
 		return true;
 	}
-	
+
 	public UserDtls getLoggedInUserDetails(Principal p) {
 		String email = p.getName();
 		UserDtls userDtls = userService.getUserByEmail(email);
@@ -106,17 +106,16 @@ public class CommonUtil {
 
 		String buccketName=null;
 
-			if (bucketType == 1) {
-				buccketName = categoryBucket;
-			} else if (bucketType == 2) {
-				buccketName = productBuccket;
-			} else {
-				buccketName = profileBuccket;
-			}
+		if (bucketType == 1) {
+			buccketName = categoryBucket;
+		} else if (bucketType == 2) {
+			buccketName = productBuccket;
+		} else {
+			buccketName = profileBuccket;
+		}
 
-			String imageName = file != null ? file.getOriginalFilename() : "default.jpg";
-			String url="https://"+buccketName+".s3.ap-south-1.amazonaws.com"+imageName;
+		String imageName = file != null ? file.getOriginalFilename() : "default.jpg";
+		String url="https://"+buccketName+".s3.amazonaws.com/"+imageName;
 		return url;
 	}
-
 }
